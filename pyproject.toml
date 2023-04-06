@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "predrnn-tf"
+version = "0.1.0"
+description = "PredRNN implementation using Tensorflow."
+authors = ["Quan Nguyen <nguyenmbquan95@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "predrnn_tf"}]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.12"
+tensorflow = "~2.9.1"
+
+[tool.poetry.group.dev.dependencies]
+jupyterlab = "^3.6.3"
+jupytext = "^1.14.5"
+numpy = "^1.24.2"
+matplotlib = "^3.7.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
