@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from keras import activations, constraints, initializers, layers, regularizers
 from keras.utils import conv_utils
+import tensorflow as tf
 from typing import Literal, Callable
 
 
@@ -90,7 +91,27 @@ class SpatialTemporalLSTMCell(layers.Layer):
     def build(self, input_shape):
         # First, we will need to calculate the shape of our output.
         self._output_size = self._calculate_output_shape(input_shape)
-        return super().build(input_shape)
+
+        # The original lstm cell's weights for the input X.
+        (self._Wxg, self._Wxi, self._Wxf,
+         # Weights for the spatial temporal memory.
+         self._Wxg_, self._Wxi_, self._Wxf_,
+         # Weights for the output.
+         self._Wxo) = self._add_weights_X(input_shape)
+
+        # The original lstm cell's weights for the hidden state.
+        (self._Whg,
+         self._Whi,
+         self._Whf,
+         self._Who) = self._add_weights_H(input_shape)
+
+        # Weight for the cell state.
+        self._Wco = self._add_weights_C(input_shape)
+
+        # Biases.
+        (self._bg, self._bi, self._bf,
+         self._bg_, self._bi_, self._bf_,
+         self._bo) = self._add_biases()
 
     def call(self, inputs, *args, **kwargs):
         return super().call(inputs, *args, **kwargs)
@@ -118,7 +139,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
     def _calculate_output_shape(self, input_shape):
         if self._data_format == "channel_first":
-            in_spatial_dim = input_shape[2:]
+            in_spatial_dim = input_shape[3:]
         else:
             in_spatial_dim = input_shape[1:-1]
 
@@ -130,16 +151,58 @@ class SpatialTemporalLSTMCell(layers.Layer):
             ) for i in range(len(in_spatial_dim))]
 
     def _add_weights_X(self, input_shape):
-        pass
+        nb_weights = 7
+        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        weights = self.add_weight(
+            name='Wx',
+            shape=shape,
+            initializer=self._kernel_initializer,
+            regularizer=self._kernel_regularizer,
+            constraint=self._kernel_constraint)
+        return tf.split(weights, nb_weights, axis=-1)
 
     def _add_weights_H(self, input_shape):
-        pass
+        nb_weights = 4
+        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        weights = self.add_weight(
+            name='Wh',
+            shape=shape,
+            initializer=self._recurrent_initializer,
+            regularizer=self._recurrent_regularizer,
+            constraint=self._recurrent_constraint)
+        return tf.split(weights, nb_weights, axis=-1)
 
     def _add_weights_M(self, input_shape):
-        pass
+        nb_weights = 4
+        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        weights = self.add_weight(
+            name='Wm',
+            shape=shape,
+            initializer=self._recurrent_initializer,
+            regularizer=self._recurrent_regularizer,
+            constraint=self._recurrent_constraint)
+        return tf.split(weights, nb_weights, axis=-1)
 
     def _add_weights_C(self, input_shape):
-        pass
+        shape = self._kernel_size + (self._in_channels(input_shape), self._filters)
+        return self.add_weight(
+            name='Wc',
+            shape=shape,
+            initializer=self._recurrent_initializer,
+            regularizer=self._recurrent_regularizer,
+            constraint=self._recurrent_constraint)
 
-    def _add_biases(self, input_shape):
-        pass
+    def _add_biases(self):
+        nb_biases = 7
+        biases = self.add_weight(
+            name='b',
+            shape=(self._filters * nb_biases),
+            initializer=self._bias_initializer,
+            regularizer=self._bias_regularizer,
+            constraint=self._bias_constraint)
+        return tf.split(biases, nb_biases)
+
+    def _in_channels(self, input_shape):
+        channel_dim = -1 if self._data_format == "channel_last" else 2
+        return input_shape[channel_dim]
+
