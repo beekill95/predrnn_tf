@@ -108,13 +108,42 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # Weight for the cell state.
         self._Wco = self._add_weights_C(input_shape)
 
+        # Weight for combining cell and spatial temporal memory state.
+        self._W11 = self._add_weight_11()
+
         # Biases.
         (self._bg, self._bi, self._bf,
          self._bg_, self._bi_, self._bf_,
          self._bo) = self._add_biases()
 
-    def call(self, inputs, *args, **kwargs):
-        return super().call(inputs, *args, **kwargs)
+    def call(self, inputs, states, training=None):
+        """
+        Perform calculation for a spatial temporal lstm cell.
+
+        Parameters
+        inputs: an input tensor or hidden state of the previous cell.
+        states: a tuple containing (hidden state, cell state, spatial temporal memory state).
+        
+        Returns
+            hidden state, (hidden state, cell state, memory state).
+        """
+        # First, get the state of the previous time step (hidden state & cell state),
+        # and the memory state of the previous layer.
+        Ht_1, Ct_1, Ml_1 = states
+
+        # Then, we will calculate the values of the original lstm cell's gates.
+        g = self._activation(
+                self._input_conv(inputs, self._Wxg)
+                + self._recurrent_conv(Ht_1, self._Whg)
+                + self._bg) # pyright: ignore
+        i = self._recurrent_activation(
+                self._input_conv(inputs, self._Wxi)
+                + self._recurrent_conv(Ht_1, self._Whi)
+                + self._bi) # pyright: ignore
+        f = self._recurrent_activation(
+                self._input_conv(inputs, self._Wxf)
+                + self._recurrent_conv(Ht_1, self._Whf)
+                + self._bf) # pyright: ignore
 
     def get_config(self):
         return {
@@ -149,6 +178,20 @@ class SpatialTemporalLSTMCell(layers.Layer):
             padding=self._padding,
             stride=self._stride[i],
             ) for i in range(len(in_spatial_dim))]
+
+    def _input_conv(self, x, w):
+        return tf.nn.conv2d(
+            x, w,
+            strides=self._stride,
+            padding=self._padding,
+            data_format=self._data_format)
+
+    def _recurrent_conv(self, x, w):
+        return tf.nn.conv2d(
+            x, w,
+            strides=(1, 1),
+            padding='same',
+            data_format=self._data_format)
 
     def _add_weights_X(self, input_shape):
         nb_weights = 7
@@ -191,6 +234,14 @@ class SpatialTemporalLSTMCell(layers.Layer):
             initializer=self._recurrent_initializer,
             regularizer=self._recurrent_regularizer,
             constraint=self._recurrent_constraint)
+
+    def _add_weight_11(self):
+        return self.add_weight(
+            name='W11',
+            shape=(1, 1, 2*self._filters, self._filters),
+            initializer=self._kernel_initializer,
+            regularizer=self._kernel_regularizer,
+            constraint=self._kernel_constraint)
 
     def _add_biases(self):
         nb_biases = 7
