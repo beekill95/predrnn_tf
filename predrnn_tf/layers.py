@@ -4,6 +4,7 @@ from keras import activations, constraints, initializers, layers, regularizers
 from keras.utils import conv_utils
 from typing import Literal, Callable
 
+
 RegularizerType = str | regularizers.Regularizer
 ConstraintType = str | constraints.Constraint
 InitializerType = str
@@ -59,7 +60,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # Activations.
         self._activation = activations.get(activation)
         self._recurrent_activation = activations.get(recurrent_activation)
-        
+
         # Weight initializers.
         self._kernel_initializer = initializers.get(kernel_initializer)
         self._recurrent_initializer = initializers.get(recurrent_initializer)
@@ -75,18 +76,28 @@ class SpatialTemporalLSTMCell(layers.Layer):
         self._recurrent_constraint = constraints.get(recurrent_constraint)
         self._bias_constraint = constraints.get(bias_constraint)
 
+        self._output_size = None
+        self._state_size = (filters, filters, filters)
+
+    @property
+    def output_size(self):
+        return self._output_size
+
+    @property
+    def state_size(self):
+        return self._state_size
+
     def build(self, input_shape):
         # First, we will need to calculate the shape of our output.
-        self.output_size = self._calculate_output_shape(input_shape)
+        self._output_size = self._calculate_output_shape(input_shape)
         return super().build(input_shape)
 
     def call(self, inputs, *args, **kwargs):
         return super().call(inputs, *args, **kwargs)
 
     def get_config(self):
-        base_config = super().get_config()
         return {
-            **base_config,
+            **super().get_config(),
             "filters": self._filters,
             "kernel_size": self._kernel_size,
             "data_format": self._data_format,
@@ -110,10 +121,25 @@ class SpatialTemporalLSTMCell(layers.Layer):
             in_spatial_dim = input_shape[2:]
         else:
             in_spatial_dim = input_shape[1:-1]
-            
+
         return [conv_utils.conv_output_length(
             in_spatial_dim[i],
             filter_size=self._kernel_size[i],
             padding=self._padding,
-            stride=self._stride[i]
-        ) for i in range(len(in_spatial_dim))]
+            stride=self._stride[i],
+            ) for i in range(len(in_spatial_dim))]
+
+    def _add_weights_X(self, input_shape):
+        pass
+
+    def _add_weights_H(self, input_shape):
+        pass
+
+    def _add_weights_M(self, input_shape):
+        pass
+
+    def _add_weights_C(self, input_shape):
+        pass
+
+    def _add_biases(self, input_shape):
+        pass
