@@ -190,10 +190,12 @@ class SpatialTemporalLSTMCell(layers.Layer):
         Ht = o * self._recurrent_activation(
                 self._recurrent_conv(CM, self._W11)) # pyright: ignore
 
-        # TODO: add decouple loss.
-        if self._decouple_loss:
-            # Probably, we can just let W_decouple = I
-            print('TODO')
+        # Add decouple loss.
+        if self._decouple_loss and training:
+            # Here, we'll let W_decouple = I
+            delta_c = i * g
+            delta_m = i_ * g_
+            self.add_loss(self._calc_decouple_loss(delta_c, delta_m))
 
         # Return the output and cell states.
         return Ht, (Ht, Ct, Ml)
@@ -222,7 +224,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
     def _calculate_output_shape(self, input_shape):
         if self._data_format == "channel_first":
-            in_spatial_dim = input_shape[3:]
+            in_spatial_dim = input_shape[2:]
         else:
             in_spatial_dim = input_shape[1:-1]
 
@@ -246,6 +248,37 @@ class SpatialTemporalLSTMCell(layers.Layer):
             strides=(1, 1),
             padding='same',
             data_format=self._data_format)
+
+    def _calc_decouple_loss(self, delta_c, delta_m):
+        """
+        Calculate decouple loss.
+
+        Parameters
+        delta_c: a tensor of shape (batch_size, channels, h, w) for "channel_first"
+            or (batch_size, channels, h, w) for "channel_last".
+        delta_m: a tensor of shape (batch_size, h, w, channels) for "channel_first"
+            or (batch_size, h, w, channels) for "channel_last".
+        """
+        batch_size = tf.shape(delta_c)[0]
+        if self._data_format == "channel_first":
+            channels = tf.shape(delta_c)[1]
+            delta_c = tf.reshape(delta_c, (batch_size, channels, -1))
+            delta_m = tf.reshape(delta_m, (batch_size, channels, -1))
+
+            dot_prod = tf.reduce_sum(tf.multiply(delta_c, delta_m), axis=-1)
+            delta_c_l2 = tf.math.l2_norm(delta_c, axis=-1)
+            delta_m_l2 = tf.math.l2_norm(delta_m, axis=-1)
+        else:
+            channels = tf.shape(delta_c)[-1]
+            delta_c = tf.reshape(delta_c, (batch_size, -1, channels))
+            delta_m = tf.reshape(delta_m, (batch_size, -1, channels))
+
+            dot_prod = tf.reduce_sum(tf.multiply(delta_c, delta_m), axis=1)
+            delta_c_l2 = tf.math.l2_norm(delta_c, axis=1)
+            delta_m_l2 = tf.math.l2_norm(delta_m, axis=1)
+
+        return tf.reduce_mean(tf.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
+        
 
     def _add_weights_X(self, input_shape):
         nb_weights = 7
