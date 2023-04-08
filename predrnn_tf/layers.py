@@ -108,6 +108,12 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # Weight for the cell state.
         self._Wco = self._add_weights_C(input_shape)
 
+        # Weights for the new spatial temporal memory state.
+        (self._Wmg,
+         self._Wmi,
+         self._Wmf,
+         self._Wmo) = self._add_weights_M(input_shape)
+
         # Weight for combining cell and spatial temporal memory state.
         self._W11 = self._add_weight_11()
 
@@ -144,6 +150,43 @@ class SpatialTemporalLSTMCell(layers.Layer):
                 self._input_conv(inputs, self._Wxf)
                 + self._recurrent_conv(Ht_1, self._Whf)
                 + self._bf) # pyright: ignore
+
+        # New cell state.
+        Ct = f * Ct_1 + i * g
+
+        # Calculate gates with the new spatial temporal memory state.
+        g_ = self._activation(
+                self._input_conv(inputs, self._Wxg_)
+                + self._recurrent_conv(Ml_1, self._Wmg)
+                + self._bg_) # pyright: ignore
+        i_ = self._recurrent_activation(
+                self._input_conv(inputs, self._Wxi_)
+                + self._recurrent_conv(Ml_1, self._Wmi)
+                + self._bi_) # pyright: ignore
+        f_ = self._recurrent_activation(
+                self._input_conv(inputs, self._Wxf_)
+                + self._recurrent_conv(Ml_1, self._Wmf)
+                + self._bf_) # pyright: ignore
+
+        # New spatial temporal state.
+        Ml = f_ * Ml_1 + i_ * g_
+
+        # Calculate output gate.
+        o = self._recurrent_activation(
+                self._input_conv(inputs, self._Wxo)
+                + self._recurrent_conv(Ht_1, self._Who)
+                + self._recurrent_conv(Ct, self._Wco)
+                + self._recurrent_conv(Ml, self._Wmo)
+                + self._bo) # pyright: ignore
+
+        # New hidden state, which is also our output.
+        channel_dim = -1 if self._data_format == "channel_last" else 2
+        CM = tf.concat([Ct, Ml], axis=channel_dim)
+        Ht = o * self._recurrent_activation(
+                self._recurrent_conv(CM, self._W11)) # pyright: ignore
+
+        # Return the output and cell states.
+        return Ht, (Ht, Ct, Ml)
 
     def get_config(self):
         return {
