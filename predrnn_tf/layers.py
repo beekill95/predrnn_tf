@@ -30,6 +30,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
                  kernel_constraint: ConstraintType | None = None,
                  recurrent_constraint: ConstraintType | None = None,
                  bias_constraint: ConstraintType | None = None,
+                 decouple_loss: bool = True,
                  **kwargs):
         """
         Construct a Spatial temporal LSTM cell as described in the
@@ -77,6 +78,10 @@ class SpatialTemporalLSTMCell(layers.Layer):
         self._recurrent_constraint = constraints.get(recurrent_constraint)
         self._bias_constraint = constraints.get(bias_constraint)
 
+        # Should decouple loss be included.
+        self._decouple_loss = decouple_loss
+
+        # Sizes required by RNN cell.
         self._output_size = None
         self._state_size = (filters, filters, filters)
 
@@ -185,6 +190,11 @@ class SpatialTemporalLSTMCell(layers.Layer):
         Ht = o * self._recurrent_activation(
                 self._recurrent_conv(CM, self._W11)) # pyright: ignore
 
+        # TODO: add decouple loss.
+        if self._decouple_loss:
+            # Probably, we can just let W_decouple = I
+            print('TODO')
+
         # Return the output and cell states.
         return Ht, (Ht, Ct, Ml)
 
@@ -207,6 +217,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
             "kernel_constraint": self._kernel_constraint,
             "recurrent_constraint": self._recurrent_constraint,
             "bias_constraint": self._bias_constraint,
+            "decouple_loss": self._decouple_loss,
         }
 
     def _calculate_output_shape(self, input_shape):
