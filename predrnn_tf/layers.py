@@ -3,6 +3,7 @@ from __future__ import annotations
 from itertools import chain
 from keras import (
     activations,
+    backend as K,
     constraints,
     initializers,
     layers,
@@ -274,7 +275,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
                 + self._bo) # pyright: ignore
 
         # New hidden state, which is also our output.
-        CM = tf.concat([Ct, Ml], axis=self.channels_dim)
+        CM = K.concatenate([Ct, Ml], axis=self.channels_dim)
         Ht = o * self._recurrent_activation(
                 self._recurrent_conv(CM, self._W11)) # pyright: ignore
 
@@ -324,14 +325,14 @@ class SpatialTemporalLSTMCell(layers.Layer):
             ) for i in range(len(in_spatial_dim))]
 
     def _input_conv(self, x, w):
-        return tf.nn.conv2d(
+        return K.conv2d(
             x, w,
             strides=self._stride,
             padding=self._padding,
             data_format=self._data_format)
 
     def _recurrent_conv(self, x, w):
-        return tf.nn.conv2d(
+        return K.conv2d(
             x, w,
             strides=(1, 1),
             padding='same',
@@ -347,24 +348,24 @@ class SpatialTemporalLSTMCell(layers.Layer):
         delta_m: a tensor of shape (batch_size, h, w, channels) for "channels_first"
             or (batch_size, h, w, channels) for "channels_last".
         """
-        batch_size = tf.shape(delta_c)[0]
-        channels = self._get_channels(tf.shape(delta_c))
+        batch_size = K.shape(delta_c)[0]
+        channels = self._get_channels(K.shape(delta_c))
         if self.is_channels_first:
-            delta_c = tf.reshape(delta_c, (batch_size, channels, -1))
-            delta_m = tf.reshape(delta_m, (batch_size, channels, -1))
+            delta_c = K.reshape(delta_c, (batch_size, channels, -1))
+            delta_m = K.reshape(delta_m, (batch_size, channels, -1))
 
-            dot_prod = tf.reduce_sum(tf.multiply(delta_c, delta_m), axis=-1)
-            delta_c_l2 = tf.math.l2_norm(delta_c, axis=-1)
-            delta_m_l2 = tf.math.l2_norm(delta_m, axis=-1)
+            dot_prod = K.sum(delta_c * delta_m, axis=-1)
+            delta_c_l2 = K.l2_normalize(delta_c, axis=-1)
+            delta_m_l2 = K.l2_normalize(delta_m, axis=-1)
         else:
-            delta_c = tf.reshape(delta_c, (batch_size, -1, channels))
-            delta_m = tf.reshape(delta_m, (batch_size, -1, channels))
+            delta_c = K.reshape(delta_c, (batch_size, -1, channels))
+            delta_m = K.reshape(delta_m, (batch_size, -1, channels))
 
-            dot_prod = tf.reduce_sum(tf.multiply(delta_c, delta_m), axis=1)
-            delta_c_l2 = tf.math.l2_norm(delta_c, axis=1)
-            delta_m_l2 = tf.math.l2_norm(delta_m, axis=1)
+            dot_prod = K.sum(delta_c * delta_m, axis=1)
+            delta_c_l2 = K.l2_normalize(delta_c, axis=1)
+            delta_m_l2 = K.l2_normalize(delta_m, axis=1)
 
-        return tf.reduce_mean(tf.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
+        return K.mean(K.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
         
     def _add_weights_X(self, input_shape):
         nb_weights = 7
