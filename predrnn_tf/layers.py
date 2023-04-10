@@ -58,20 +58,21 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         assert nb_cell_states == len(self._cells), "Invalid states: there are not enough states for cells."
 
         # The spatial temporal memory of the last cell in the previous time step.
-        ml_1 = states[-1]
+        previous_m = states[-1]
 
         # Call each cell and store the resulting states.
         out_states = []
         x = inputs
-        for i, (cell, (h, c, m)) in enumerate(zip(self._cells, utils.triplet(states))):
-            # For the first cell, we use the spatial temporal memory
-            # of the last cell in the previous time step.
-            if i == 0:
-                m = ml_1
+        for cell, (h, c, _) in zip(self._cells, utils.triplet(states)):
+            # Instead of using the hidden and cell state of the same cell in the previous time step,
+            # the spatial temporal memory is from the previous cell of the same time step,
+            # or the last cell of the previous time step.
+            x, s = cell.call(x, (h, c, previous_m), training=training)
 
-            # Let each cell perform its calculations,
-            # and then store the resulting states.
-            x, s = cell.call(x, (h, c, m), training=training)
+            # Store the spatial temporal memory cell so we could pass it to the next cell.
+            previous_m = s[-1]
+
+            # Store the cell's states.
             out_states.extend(s)
 
         return x, out_states
