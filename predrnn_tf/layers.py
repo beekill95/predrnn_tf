@@ -1,14 +1,87 @@
 from __future__ import annotations
 
+from itertools import chain
 from keras import activations, constraints, initializers, layers, regularizers
 from keras.utils import conv_utils
 import tensorflow as tf
 from typing import Literal, Callable
 
+from . import utils
+
 
 RegularizerType = str | regularizers.Regularizer
 ConstraintType = str | constraints.Constraint
 InitializerType = str
+
+
+class StackedSpatialTemporalLSTMCell(layers.Layer):
+    def __init__(self, cells: list[SpatialTemporalLSTMCell], **kwargs):
+        """
+        Construct a stacked spatial temporal LSTM cell based on the
+        [paper](https://dl.acm.org/doi/abs/10.5555/3294771.3294855)
+        and the [paper](https://arxiv.org/abs/2103.09504).
+        """
+        super().__init__(**kwargs)
+        self._cells = cells
+        self._state_size = tuple(chain(*[c.state_size for c in cells]))
+
+    @property
+    def output_size(self):
+        return self._cells[-1].output_size
+
+    @property
+    def state_size(self):
+        return self._state_size
+
+    def build(self, input_shape):
+        for cell in self._cells:
+            cell.build(input_shape)
+            input_shape = cell.output_size
+
+    def call(self, inputs, states, training=None):
+        """
+        Perform the calculation based on the the data flow described in the papers.
+        In particular, the hidden states and cell states are transfered in the temporal dimension,
+        while the spatial-temporal memory is transfered in the zigzag direction.
+
+        Parameters
+        inputs: input tensor to the cell of shape (batch_size, channels, H, W) or (batch_size, H, W, channels).
+        states: the list containing cell states of the previous time step of shape.
+            The list contains the cell states of each cell: (h1, c1, m1, h2, c2, m2, ...).
+
+        Returns
+            hidden state, [h1, c1, m1, h2, c2, m2, ...]
+        """
+        # The lenght of the states must be divisible by 3.
+        nb_cell_states, remaining_states = divmod(len(states), 3)
+        assert remaining_states == 0, "Invalid states: the lenght of states must be a multiple of 3."
+        assert nb_cell_states == len(self._cells), "Invalid states: there are not enough states for cells."
+
+        # The spatial temporal memory of the last cell in the previous time step.
+        ml_1 = states[-1]
+
+        # Call each cell and store the resulting states.
+        out_states = []
+        x = inputs
+        for i, (cell, (h, c, m)) in enumerate(zip(self._cells, utils.triplet(states))):
+            # For the first cell, we use the spatial temporal memory
+            # of the last cell in the previous time step.
+            if i == 0:
+                m = ml_1
+
+            # Let each cell perform its calculations,
+            # and then store the resulting states.
+            x, s = cell.call(x, (h, c, m), training=training)
+            out_states.extend(s)
+
+        return x, out_states
+
+    def get_config(self):
+        return {
+            **super().get_config(),
+            'cells': self._cells,
+        }
+
 
 
 class SpatialTemporalLSTMCell(layers.Layer):
@@ -82,7 +155,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         self._decouple_loss = decouple_loss
 
         # Sizes required by RNN cell.
-        self._output_size = None
+        self._output_size = None # Will be calculated once the cell is built.
         self._state_size = (filters, filters, filters)
 
     @property
@@ -279,7 +352,6 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
         return tf.reduce_mean(tf.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
         
-
     def _add_weights_X(self, input_shape):
         nb_weights = 7
         shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
