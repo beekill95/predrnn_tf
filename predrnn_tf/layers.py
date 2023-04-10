@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from itertools import chain
-from keras import activations, constraints, initializers, layers, regularizers
+from keras import (
+    activations,
+    constraints,
+    initializers,
+    layers,
+    regularizers,
+)
 from keras.utils import conv_utils
 import tensorflow as tf
 from typing import Literal, Callable
@@ -93,7 +99,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
                  padding: Literal["same", "valid"] = "same",
                  activation: str | Callable = 'tanh',
                  stride: tuple[int, int] | int = (1, 1),
-                 data_format: Literal['channel_first', 'channel_last'] | None = None,
+                 data_format: Literal['channels_first', 'channels_last'] | None = None,
                  recurrent_activation: str | Callable = "hard_sigmoid",
                  kernel_initializer: str = "glorot_uniform",
                  recurrent_initializer: str = "orthogonal",
@@ -167,6 +173,14 @@ class SpatialTemporalLSTMCell(layers.Layer):
     def state_size(self):
         return self._state_size
 
+    @property
+    def is_channels_first(self):
+        return self._data_format == 'channels_first'
+
+    @property
+    def channels_dim(self):
+        return 1 if self.is_channels_first else -1
+
     def build(self, input_shape):
         # First, we will need to calculate the shape of our output.
         self._output_size = self._calculate_output_shape(input_shape)
@@ -206,7 +220,8 @@ class SpatialTemporalLSTMCell(layers.Layer):
         Perform calculation for a spatial temporal lstm cell.
 
         Parameters
-        inputs: an input tensor or hidden state of the previous cell.
+        inputs: an input tensor or hidden state of the previous cell,
+            the tensor has shape (batch_size, channels, H, W) or (batch_size, H, W, channels).
         states: a tuple containing (hidden state, cell state, spatial temporal memory state).
         
         Returns
@@ -259,8 +274,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
                 + self._bo) # pyright: ignore
 
         # New hidden state, which is also our output.
-        channel_dim = -1 if self._data_format == "channel_last" else 2
-        CM = tf.concat([Ct, Ml], axis=channel_dim)
+        CM = tf.concat([Ct, Ml], axis=self.channels_dim)
         Ht = o * self._recurrent_activation(
                 self._recurrent_conv(CM, self._W11)) # pyright: ignore
 
@@ -297,7 +311,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         }
 
     def _calculate_output_shape(self, input_shape):
-        if self._data_format == "channel_first":
+        if self.is_channels_first:
             in_spatial_dim = input_shape[2:]
         else:
             in_spatial_dim = input_shape[1:-1]
@@ -328,14 +342,14 @@ class SpatialTemporalLSTMCell(layers.Layer):
         Calculate decouple loss.
 
         Parameters
-        delta_c: a tensor of shape (batch_size, channels, h, w) for "channel_first"
-            or (batch_size, channels, h, w) for "channel_last".
-        delta_m: a tensor of shape (batch_size, h, w, channels) for "channel_first"
-            or (batch_size, h, w, channels) for "channel_last".
+        delta_c: a tensor of shape (batch_size, channels, h, w) for "channels_first"
+            or (batch_size, channels, h, w) for "channels_last".
+        delta_m: a tensor of shape (batch_size, h, w, channels) for "channels_first"
+            or (batch_size, h, w, channels) for "channels_last".
         """
         batch_size = tf.shape(delta_c)[0]
-        if self._data_format == "channel_first":
-            channels = tf.shape(delta_c)[1]
+        channels = self._get_channels(tf.shape(delta_c))
+        if self.is_channels_first:
             delta_c = tf.reshape(delta_c, (batch_size, channels, -1))
             delta_m = tf.reshape(delta_m, (batch_size, channels, -1))
 
@@ -343,7 +357,6 @@ class SpatialTemporalLSTMCell(layers.Layer):
             delta_c_l2 = tf.math.l2_norm(delta_c, axis=-1)
             delta_m_l2 = tf.math.l2_norm(delta_m, axis=-1)
         else:
-            channels = tf.shape(delta_c)[-1]
             delta_c = tf.reshape(delta_c, (batch_size, -1, channels))
             delta_m = tf.reshape(delta_m, (batch_size, -1, channels))
 
@@ -355,7 +368,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         
     def _add_weights_X(self, input_shape):
         nb_weights = 7
-        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
         weights = self.add_weight(
             name='Wx',
             shape=shape,
@@ -366,7 +379,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
     def _add_weights_H(self, input_shape):
         nb_weights = 4
-        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
         weights = self.add_weight(
             name='Wh',
             shape=shape,
@@ -377,7 +390,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
     def _add_weights_M(self, input_shape):
         nb_weights = 4
-        shape = self._kernel_size + (self._in_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
         weights = self.add_weight(
             name='Wm',
             shape=shape,
@@ -387,7 +400,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         return tf.split(weights, nb_weights, axis=-1)
 
     def _add_weights_C(self, input_shape):
-        shape = self._kernel_size + (self._in_channels(input_shape), self._filters)
+        shape = self._kernel_size + (self._get_channels(input_shape), self._filters)
         return self.add_weight(
             name='Wc',
             shape=shape,
@@ -413,7 +426,6 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._bias_constraint)
         return tf.split(biases, nb_biases)
 
-    def _in_channels(self, input_shape):
-        channel_dim = -1 if self._data_format == "channel_last" else 2
-        return input_shape[channel_dim]
+    def _get_channels(self, input_shape):
+        return input_shape[self.channels_dim]
 
