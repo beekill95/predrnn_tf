@@ -30,7 +30,6 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         """
         super().__init__(**kwargs)
         self._cells = cells
-        self._state_size = tuple(chain(*[c.state_size for c in cells]))
 
     @property
     def output_size(self):
@@ -41,9 +40,35 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         return self._state_size
 
     def build(self, input_shape):
-        for cell in self._cells:
+        cells = self._cells
+        prev_m_nb_channels = None
+        self._Wms = []
+        for i, cell in enumerate(cells):
             cell.build(input_shape)
             input_shape = cell.output_size
+
+            # Create weight to handle the mismatched dimensions when M is moved from the previous cell
+            # to the current cell.
+            cur_m_nb_channels = cell.get_channels(cell.state_size[-1])
+            if prev_m_nb_channels is not None and prev_m_nb_channels != cur_m_nb_channels:
+                Wm = self.add_weight(
+                    f'Wm_{i}', shape=(1, 1, prev_m_nb_channels, cur_m_nb_channels))
+                self._Wms.append(Wm)
+            else:
+                self._Wms.append(None)
+
+            # Update the current number of channels of the M memory state.
+            prev_m_nb_channels = cur_m_nb_channels
+
+        self._state_size = tuple(chain(*[c.state_size for c in self._cells]))
+
+        # We also need to take care the dimensions mismatched between
+        # the last cell's memory state and the first cell's memory state.
+        first_cell_M_nb_channels = cells[0].get_channels(self._state_size[2])
+        last_cell_M_nb_channels = cells[-1].get_channels(self._state_size[-1])
+        if first_cell_M_nb_channels != last_cell_M_nb_channels:
+            self._Wms[0] = self.add_weight(
+                'Wm_0', shape=(1, 1, last_cell_M_nb_channels, first_cell_M_nb_channels))
 
     def call(self, inputs, states, training=None):
         """
@@ -70,7 +95,11 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         # Call each cell and store the resulting states.
         out_states = []
         x = inputs
-        for cell, (h, c, _) in zip(self._cells, utils.triplet(states)):
+        for cell, (h, c, _), Wm in zip(self._cells, utils.triplet(states), self._Wms):
+            # Need to adjust the M's dimension if necessary.
+            if Wm is not None:
+                previous_m = K.conv2d(previous_m, Wm, data_format=cell.data_format)
+
             # Instead of using the hidden and cell state of the same cell in the previous time step,
             # the spatial temporal memory is from the previous cell of the same time step,
             # or the last cell of the previous time step.
@@ -176,6 +205,10 @@ class SpatialTemporalLSTMCell(layers.Layer):
     @property
     def channels_dim(self):
         return 1 if self.is_channels_first else -1
+
+    @property
+    def data_format(self):
+        return self._data_format
 
     def build(self, input_shape):
         # First, we will need to calculate the shape of our output.
