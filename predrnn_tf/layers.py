@@ -91,7 +91,6 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         }
 
 
-
 class SpatialTemporalLSTMCell(layers.Layer):
     def __init__(self,
                  filters: int,
@@ -162,10 +161,6 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # Should decouple loss be included.
         self._decouple_loss = decouple_loss
 
-        # Sizes required by RNN cell.
-        self._output_size = None # Will be calculated once the cell is built.
-        self._state_size = (filters, filters, filters)
-
     @property
     def output_size(self):
         return self._output_size
@@ -184,7 +179,11 @@ class SpatialTemporalLSTMCell(layers.Layer):
 
     def build(self, input_shape):
         # First, we will need to calculate the shape of our output.
-        self._output_size = self._calculate_output_shape(input_shape)
+        output_size = self._calculate_output_shape(input_shape)
+        self._output_size = output_size
+        # State size should not contain batch dimensions,
+        # or else it will cause error when using as cell inside RNN layer.
+        self._state_size = (output_size[1:], output_size[1:], output_size[1:])
 
         # The original lstm cell's weights for the input X.
         (self._Wxg, self._Wxi, self._Wxf,
@@ -312,17 +311,16 @@ class SpatialTemporalLSTMCell(layers.Layer):
         }
 
     def _calculate_output_shape(self, input_shape):
-        if self.is_channels_first:
-            in_spatial_dim = input_shape[2:]
-        else:
-            in_spatial_dim = input_shape[1:-1]
-
-        return [conv_utils.conv_output_length(
-            in_spatial_dim[i],
-            filter_size=self._kernel_size[i],
-            padding=self._padding,
-            stride=self._stride[i],
-            ) for i in range(len(in_spatial_dim))]
+        batch_size = input_shape[0]
+        in_spatial_dim = input_shape[2:] if self.is_channels_first else input_shape[1:-1]
+        spatial_output_size = tuple(conv_utils.conv_output_length(in_spatial_dim[i],
+                                                                  filter_size=self._kernel_size[i],
+                                                                  padding=self._padding,
+                                                                  stride=self._stride[i])
+                                    for i in range(len(in_spatial_dim)))
+        return tf.TensorShape((batch_size, self._filters, *spatial_output_size)
+                              if self.is_channels_first
+                              else (batch_size, *spatial_output_size, self._filters))
 
     def _input_conv(self, x, w):
         return K.conv2d(
