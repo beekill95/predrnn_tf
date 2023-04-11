@@ -196,16 +196,16 @@ class SpatialTemporalLSTMCell(layers.Layer):
         (self._Whg,
          self._Whi,
          self._Whf,
-         self._Who) = self._add_weights_H(input_shape)
+         self._Who) = self._add_weights_H()
 
         # Weight for the cell state.
-        self._Wco = self._add_weights_C(input_shape)
+        self._Wco = self._add_weights_C()
 
         # Weights for the new spatial temporal memory state.
         (self._Wmg,
          self._Wmi,
          self._Wmf,
-         self._Wmo) = self._add_weights_M(input_shape)
+         self._Wmo) = self._add_weights_M()
 
         # Weight for combining cell and spatial temporal memory state.
         self._W11 = self._add_weight_11()
@@ -347,7 +347,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
             or (batch_size, h, w, channels) for "channels_last".
         """
         batch_size = K.shape(delta_c)[0]
-        channels = self._get_channels(K.shape(delta_c))
+        channels = self.get_channels(K.shape(delta_c))
         if self.is_channels_first:
             delta_c = K.reshape(delta_c, (batch_size, channels, -1))
             delta_m = K.reshape(delta_m, (batch_size, channels, -1))
@@ -367,7 +367,7 @@ class SpatialTemporalLSTMCell(layers.Layer):
         
     def _add_weights_X(self, input_shape):
         nb_weights = 7
-        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self.get_channels(input_shape), self._filters * nb_weights)
         weights = self.add_weight(
             name='Wx',
             shape=shape,
@@ -376,9 +376,9 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._kernel_constraint)
         return tf.split(weights, nb_weights, axis=-1)
 
-    def _add_weights_H(self, input_shape):
+    def _add_weights_H(self):
         nb_weights = 4
-        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self._filters, self._filters * nb_weights)
         weights = self.add_weight(
             name='Wh',
             shape=shape,
@@ -387,9 +387,9 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._recurrent_constraint)
         return tf.split(weights, nb_weights, axis=-1)
 
-    def _add_weights_M(self, input_shape):
+    def _add_weights_M(self):
         nb_weights = 4
-        shape = self._kernel_size + (self._get_channels(input_shape), self._filters * nb_weights)
+        shape = self._kernel_size + (self._filters, self._filters * nb_weights)
         weights = self.add_weight(
             name='Wm',
             shape=shape,
@@ -398,8 +398,8 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._recurrent_constraint)
         return tf.split(weights, nb_weights, axis=-1)
 
-    def _add_weights_C(self, input_shape):
-        shape = self._kernel_size + (self._get_channels(input_shape), self._filters)
+    def _add_weights_C(self):
+        shape = self._kernel_size + (self._filters, self._filters)
         return self.add_weight(
             name='Wc',
             shape=shape,
@@ -425,6 +425,6 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._bias_constraint)
         return tf.split(biases, nb_biases)
 
-    def _get_channels(self, input_shape):
+    def get_channels(self, input_shape):
         return input_shape[self.channels_dim]
 
