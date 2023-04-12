@@ -44,21 +44,22 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         prev_m_nb_channels = None
         self._Wms = []
         for i, cell in enumerate(cells):
-            cell.build(input_shape)
-            input_shape = cell.output_size
+            with tf.name_scope(f'cell_{i}'):
+                cell.build(input_shape)
+                input_shape = cell.output_size
 
-            # Create weight to handle the mismatched dimensions when M is moved from the previous cell
-            # to the current cell.
-            cur_m_nb_channels = cell.get_channels(cell.state_size[-1])
-            if prev_m_nb_channels is not None and prev_m_nb_channels != cur_m_nb_channels:
-                Wm = self.add_weight(
-                    f'Wm_{i}', shape=(1, 1, prev_m_nb_channels, cur_m_nb_channels))
-                self._Wms.append(Wm)
-            else:
-                self._Wms.append(None)
+                # Create weight to handle the mismatched dimensions when M is moved from the previous cell
+                # to the current cell.
+                cur_m_nb_channels = cell.get_channels(cell.state_size[-1])
+                if prev_m_nb_channels is not None and prev_m_nb_channels != cur_m_nb_channels:
+                    Wm = self.add_weight(
+                        f'stacked_Wm_{i}', shape=(1, 1, prev_m_nb_channels, cur_m_nb_channels))
+                    self._Wms.append(Wm)
+                else:
+                    self._Wms.append(None)
 
-            # Update the current number of channels of the M memory state.
-            prev_m_nb_channels = cur_m_nb_channels
+                # Update the current number of channels of the M memory state.
+                prev_m_nb_channels = cur_m_nb_channels
 
         self._state_size = tuple(chain(*[c.state_size for c in self._cells]))
 
@@ -68,7 +69,7 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
         last_cell_M_nb_channels = cells[-1].get_channels(self._state_size[-1])
         if first_cell_M_nb_channels != last_cell_M_nb_channels:
             self._Wms[0] = self.add_weight(
-                'Wm_0', shape=(1, 1, last_cell_M_nb_channels, first_cell_M_nb_channels))
+                'stacked_Wm_0', shape=(1, 1, last_cell_M_nb_channels, first_cell_M_nb_channels))
 
     def call(self, inputs, states, training=None):
         """
@@ -229,16 +230,16 @@ class SpatialTemporalLSTMCell(layers.Layer):
         (self._Whg,
          self._Whi,
          self._Whf,
-         self._Who) = self._add_weights_H()
+         self._Who) = self._add_recurrent_weights('Wh', 4)
 
         # Weight for the cell state.
-        self._Wco = self._add_weights_C()
+        self._Wco, = self._add_recurrent_weights('Wc', 1)
 
         # Weights for the new spatial temporal memory state.
         (self._Wmg,
          self._Wmi,
          self._Wmf,
-         self._Wmo) = self._add_weights_M()
+         self._Wmo) = self._add_recurrent_weights('Wm', 4)
 
         # Weight for combining cell and spatial temporal memory state.
         self._W11 = self._add_weight_11()
@@ -379,6 +380,9 @@ class SpatialTemporalLSTMCell(layers.Layer):
         delta_m: a tensor of shape (batch_size, h, w, channels) for "channels_first"
             or (batch_size, h, w, channels) for "channels_last".
         """
+        def norm(tensor, axis=-1):
+            return K.sqrt(K.sum(tensor * tensor, axis=axis))
+
         batch_size = K.shape(delta_c)[0]
         channels = self.get_channels(K.shape(delta_c))
         if self.is_channels_first:
@@ -386,59 +390,42 @@ class SpatialTemporalLSTMCell(layers.Layer):
             delta_m = K.reshape(delta_m, (batch_size, channels, -1))
 
             dot_prod = K.sum(delta_c * delta_m, axis=-1)
-            delta_c_l2 = K.l2_normalize(delta_c, axis=-1)
-            delta_m_l2 = K.l2_normalize(delta_m, axis=-1)
+            delta_c_l2 = norm(delta_c, axis=-1)
+            delta_m_l2 = norm(delta_m, axis=-1)
         else:
             delta_c = K.reshape(delta_c, (batch_size, -1, channels))
             delta_m = K.reshape(delta_m, (batch_size, -1, channels))
 
             dot_prod = K.sum(delta_c * delta_m, axis=1)
-            delta_c_l2 = K.l2_normalize(delta_c, axis=1)
-            delta_m_l2 = K.l2_normalize(delta_m, axis=1)
+            delta_c_l2 = norm(delta_c, axis=1)
+            delta_m_l2 = norm(delta_m, axis=1)
 
         return K.mean(K.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
         
     def _add_weights_X(self, input_shape):
+        def w(widx: int):
+            shape = self._kernel_size + (self.get_channels(input_shape), self._filters)
+            return self.add_weight(
+                name=f'Wx{widx}',
+                shape=shape,
+                initializer=self._kernel_initializer,
+                regularizer=self._kernel_regularizer,
+                constraint=self._kernel_constraint)
+
         nb_weights = 7
-        shape = self._kernel_size + (self.get_channels(input_shape), self._filters * nb_weights)
-        weights = self.add_weight(
-            name='Wx',
-            shape=shape,
-            initializer=self._kernel_initializer,
-            regularizer=self._kernel_regularizer,
-            constraint=self._kernel_constraint)
-        return tf.split(weights, nb_weights, axis=-1)
+        return tuple(w(i) for i in range(nb_weights))
 
-    def _add_weights_H(self):
-        nb_weights = 4
-        shape = self._kernel_size + (self._filters, self._filters * nb_weights)
-        weights = self.add_weight(
-            name='Wh',
-            shape=shape,
-            initializer=self._recurrent_initializer,
-            regularizer=self._recurrent_regularizer,
-            constraint=self._recurrent_constraint)
-        return tf.split(weights, nb_weights, axis=-1)
+    def _add_recurrent_weights(self, name: str, nb_weights: int):
+        def w(widx: int):
+            shape = self._kernel_size + (self._filters, self._filters)
+            return self.add_weight(
+                name=f'{name}{widx}',
+                shape=shape,
+                initializer=self._recurrent_initializer,
+                regularizer=self._recurrent_regularizer,
+                constraint=self._recurrent_constraint)
 
-    def _add_weights_M(self):
-        nb_weights = 4
-        shape = self._kernel_size + (self._filters, self._filters * nb_weights)
-        weights = self.add_weight(
-            name='Wm',
-            shape=shape,
-            initializer=self._recurrent_initializer,
-            regularizer=self._recurrent_regularizer,
-            constraint=self._recurrent_constraint)
-        return tf.split(weights, nb_weights, axis=-1)
-
-    def _add_weights_C(self):
-        shape = self._kernel_size + (self._filters, self._filters)
-        return self.add_weight(
-            name='Wc',
-            shape=shape,
-            initializer=self._recurrent_initializer,
-            regularizer=self._recurrent_regularizer,
-            constraint=self._recurrent_constraint)
+        return tuple(w(i) for i in range(nb_weights))
 
     def _add_weight_11(self):
         return self.add_weight(
@@ -449,15 +436,16 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._kernel_constraint)
 
     def _add_biases(self):
+        def b(bidx: int):
+            return self.add_weight(
+                    name=f'b{bidx}',
+                    shape=(self._filters,),
+                    initializer=self._bias_initializer,
+                    regularizer=self._bias_regularizer,
+                    constraint=self._bias_constraint)
+
         nb_biases = 7
-        biases = self.add_weight(
-            name='b',
-            shape=(self._filters * nb_biases),
-            initializer=self._bias_initializer,
-            regularizer=self._bias_regularizer,
-            constraint=self._bias_constraint)
-        return tf.split(biases, nb_biases)
+        return tuple(b(i) for i in range(nb_biases))
 
     def get_channels(self, input_shape):
         return input_shape[self.channels_dim]
-
