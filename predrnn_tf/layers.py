@@ -220,34 +220,22 @@ class SpatialTemporalLSTMCell(layers.Layer):
         self._state_size = (output_size[1:], output_size[1:], output_size[1:])
 
         # The original lstm cell's weights for the input X.
-        (self._Wxg, self._Wxi, self._Wxf,
-         # Weights for the spatial temporal memory.
-         self._Wxg_, self._Wxi_, self._Wxf_,
-         # Weights for the output.
-         self._Wxo) = self._add_weights_X(input_shape)
+        self._Wx = self._add_weights_X(input_shape)
 
         # The original lstm cell's weights for the hidden state.
-        (self._Whg,
-         self._Whi,
-         self._Whf,
-         self._Who) = self._add_recurrent_weights('Wh', 4)
+        self._Wh = self._add_recurrent_weights('Wh', 4)
 
         # Weight for the cell state.
-        self._Wco, = self._add_recurrent_weights('Wc', 1)
+        self._Wco = self._add_recurrent_weights('Wco', 1)
 
         # Weights for the new spatial temporal memory state.
-        (self._Wmg,
-         self._Wmi,
-         self._Wmf,
-         self._Wmo) = self._add_recurrent_weights('Wm', 4)
+        self._Wm = self._add_recurrent_weights('Wm', 4)
 
         # Weight for combining cell and spatial temporal memory state.
         self._W11 = self._add_weight_11()
 
         # Biases.
-        (self._bg, self._bi, self._bf,
-         self._bg_, self._bi_, self._bf_,
-         self._bo) = self._add_biases()
+        self._b = self._add_biases()
 
     def call(self, inputs, states, training=None):
         """
@@ -265,47 +253,65 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # and the memory state of the previous layer.
         Ht_1, Ct_1, Ml_1 = states
 
+        # The original lstm cell's weights for the input X.
+        (Wxg, Wxi, Wxf,
+         # Weights for the spatial temporal memory.
+         Wxg_, Wxi_, Wxf_,
+         # Weights for the output.
+         Wxo) = tf.split(self._Wx, 7, axis=-1)
+
+        # The original lstm cell's weights for the hidden state.
+        (Whg, Whi, Whf, Who) = tf.split(self._Wh, 4, axis=-1)
+
+        # The original lstm cell's weights for the hidden state.
+        (Wmg, Wmi, Wmf, Wmo) = tf.split(self._Wm, 4, axis=-1)
+
+        # Biases.
+        (bg, bi, bf,
+         bg_, bi_, bf_,
+         bo) = tf.split(self._b, 7, axis=-1)
+
         # Then, we will calculate the values of the original lstm cell's gates.
         g = self._activation(
-                self._input_conv(inputs, self._Wxg)
-                + self._recurrent_conv(Ht_1, self._Whg)
-                + self._bg) # pyright: ignore
+                self._input_conv(inputs, Wxg)
+                + self._recurrent_conv(Ht_1, Whg)
+                + bg) # pyright: ignore
         i = self._recurrent_activation(
-                self._input_conv(inputs, self._Wxi)
-                + self._recurrent_conv(Ht_1, self._Whi)
-                + self._bi) # pyright: ignore
+                self._input_conv(inputs, Wxi)
+                + self._recurrent_conv(Ht_1, Whi)
+                + bi) # pyright: ignore
         f = self._recurrent_activation(
-                self._input_conv(inputs, self._Wxf)
-                + self._recurrent_conv(Ht_1, self._Whf)
-                + self._bf) # pyright: ignore
+                self._input_conv(inputs, Wxf)
+                + self._recurrent_conv(Ht_1, Whf)
+                + bf) # pyright: ignore
 
         # New cell state.
         Ct = f * Ct_1 + i * g
 
         # Calculate gates with the new spatial temporal memory state.
         g_ = self._activation(
-                self._input_conv(inputs, self._Wxg_)
-                + self._recurrent_conv(Ml_1, self._Wmg)
-                + self._bg_) # pyright: ignore
+                self._input_conv(inputs, Wxg_)
+                + self._recurrent_conv(Ml_1, Wmg)
+                + bg_) # pyright: ignore
         i_ = self._recurrent_activation(
-                self._input_conv(inputs, self._Wxi_)
-                + self._recurrent_conv(Ml_1, self._Wmi)
-                + self._bi_) # pyright: ignore
+                self._input_conv(inputs, Wxi_)
+                + self._recurrent_conv(Ml_1, Wmi)
+                + bi_) # pyright: ignore
         f_ = self._recurrent_activation(
-                self._input_conv(inputs, self._Wxf_)
-                + self._recurrent_conv(Ml_1, self._Wmf)
-                + self._bf_) # pyright: ignore
+                self._input_conv(inputs, Wxf_)
+                + self._recurrent_conv(Ml_1, Wmf)
+                + bf_) # pyright: ignore
 
         # New spatial temporal state.
         Ml = f_ * Ml_1 + i_ * g_
 
         # Calculate output gate.
         o = self._recurrent_activation(
-                self._input_conv(inputs, self._Wxo)
-                + self._recurrent_conv(Ht_1, self._Who)
+                self._input_conv(inputs, Wxo)
+                + self._recurrent_conv(Ht_1, Who)
                 + self._recurrent_conv(Ct, self._Wco)
-                + self._recurrent_conv(Ml, self._Wmo)
-                + self._bo) # pyright: ignore
+                + self._recurrent_conv(Ml, Wmo)
+                + bo) # pyright: ignore
 
         # New hidden state, which is also our output.
         CM = K.concatenate([Ct, Ml], axis=self.channels_dim)
@@ -403,29 +409,23 @@ class SpatialTemporalLSTMCell(layers.Layer):
         return K.mean(K.abs(dot_prod) / (delta_c_l2 * delta_m_l2))
         
     def _add_weights_X(self, input_shape):
-        def w(widx: int):
-            shape = self._kernel_size + (self.get_channels(input_shape), self._filters)
-            return self.add_weight(
-                name=f'Wx{widx}',
-                shape=shape,
-                initializer=self._kernel_initializer,
-                regularizer=self._kernel_regularizer,
-                constraint=self._kernel_constraint)
-
         nb_weights = 7
-        return tuple(w(i) for i in range(nb_weights))
+        shape = self._kernel_size + (self.get_channels(input_shape), self._filters * nb_weights)
+        return self.add_weight(
+            name=f'Wx',
+            shape=shape,
+            initializer=self._kernel_initializer,
+            regularizer=self._kernel_regularizer,
+            constraint=self._kernel_constraint)
 
     def _add_recurrent_weights(self, name: str, nb_weights: int):
-        def w(widx: int):
-            shape = self._kernel_size + (self._filters, self._filters)
-            return self.add_weight(
-                name=f'{name}{widx}',
-                shape=shape,
-                initializer=self._recurrent_initializer,
-                regularizer=self._recurrent_regularizer,
-                constraint=self._recurrent_constraint)
-
-        return tuple(w(i) for i in range(nb_weights))
+        shape = self._kernel_size + (self._filters, self._filters * nb_weights)
+        return self.add_weight(
+            name=name,
+            shape=shape,
+            initializer=self._recurrent_initializer,
+            regularizer=self._recurrent_regularizer,
+            constraint=self._recurrent_constraint)
 
     def _add_weight_11(self):
         return self.add_weight(
@@ -436,16 +436,13 @@ class SpatialTemporalLSTMCell(layers.Layer):
             constraint=self._kernel_constraint)
 
     def _add_biases(self):
-        def b(bidx: int):
-            return self.add_weight(
-                    name=f'b{bidx}',
-                    shape=(self._filters,),
-                    initializer=self._bias_initializer,
-                    regularizer=self._bias_regularizer,
-                    constraint=self._bias_constraint)
-
         nb_biases = 7
-        return tuple(b(i) for i in range(nb_biases))
+        return self.add_weight(
+                name='biases',
+                shape=(self._filters * nb_biases,),
+                initializer=self._bias_initializer,
+                regularizer=self._bias_regularizer,
+                constraint=self._bias_constraint)
 
     def get_channels(self, input_shape):
         return input_shape[self.channels_dim]
