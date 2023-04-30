@@ -21,6 +21,7 @@ ConstraintType = str | constraints.Constraint
 InitializerType = str
 
 
+@tf.keras.utils.register_keras_serializable()
 class StackedSpatialTemporalLSTMCell(layers.Layer):
     def __init__(self, cells: list[SpatialTemporalLSTMCell], **kwargs):
         """
@@ -71,6 +72,8 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
             self._Wms[0] = self.add_weight(
                 'stacked_Wm_0', shape=(1, 1, last_cell_M_nb_channels, first_cell_M_nb_channels))
 
+        self.built = True
+
     def call(self, inputs, states, training=None):
         """
         Perform the calculation based on the the data flow described in the papers.
@@ -120,7 +123,13 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
             'cells': self._cells,
         }
 
+    @classmethod
+    def from_config(cls, config):
+        cells = [SpatialTemporalLSTMCell.from_config(c['config']) for c in config.pop('cells')]
+        return cls(cells=cells, **config)
 
+
+@tf.keras.utils.register_keras_serializable()
 class SpatialTemporalLSTMCell(layers.Layer):
     def __init__(self,
                  filters: int,
@@ -237,6 +246,8 @@ class SpatialTemporalLSTMCell(layers.Layer):
         # Biases.
         self._b = self._add_biases()
 
+        self.built = True
+
     def call(self, inputs, states, training=None):
         """
         Perform calculation for a spatial temporal lstm cell.
@@ -349,6 +360,10 @@ class SpatialTemporalLSTMCell(layers.Layer):
             "bias_constraint": self._bias_constraint,
             "decouple_loss": self._decouple_loss,
         }
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
     def _calculate_output_shape(self, input_shape):
         batch_size = input_shape[0]
