@@ -21,9 +21,15 @@ import keras
 from keras import layers, utils, losses, optimizers, callbacks
 import matplotlib.pyplot as plt
 import numpy as np
-import tensorflow as tf
 
 from predrnn_tf.layers import SpatialTemporalLSTMCell, StackedSpatialTemporalLSTMCell
+
+# %% tags=["parameters"]
+# Notebook's parameters, to be run with `papermill`.
+model_save_path = './saved_models/moving_mnist_predrnn'
+
+# %%
+print(f'{model_save_path=}')
 
 # %% [markdown]
 # # Moving MNIST with PredRNN
@@ -34,7 +40,7 @@ from predrnn_tf.layers import SpatialTemporalLSTMCell, StackedSpatialTemporalLST
 # %%
 # We'll work with this many data.
 # Adjust this if you want to work with more data.
-data_size = 1000
+data_size = 10000
 
 # Download and load the dataset.
 fpath = utils.get_file(
@@ -119,11 +125,19 @@ cells = StackedSpatialTemporalLSTMCell([
 ])
 rnn = layers.RNN(cells, return_sequences=True)
 
-out = layers.Conv3D(
-    filters=1,
-    kernel_size=(3, 3, 3),
-    activation="sigmoid",
-    padding="same",
+# out = layers.Conv3D(
+#     filters=1,
+#     kernel_size=(3, 3, 3),
+#     activation="sigmoid",
+#     padding="same",
+# )
+out = layers.TimeDistributed(
+    layers.Conv2D(
+        filters=1,
+        kernel_size=1,
+        activation="sigmoid",
+        padding="same",
+    )
 )
 
 # Construct the model.
@@ -137,7 +151,8 @@ predrnn.summary()
 
 # %%
 predrnn.compile(
-    loss=losses.binary_crossentropy,
+    #loss=losses.binary_crossentropy,
+    loss=losses.mse,
     optimizer=optimizers.Adam(),
 )
 
@@ -146,8 +161,8 @@ early_stopping = callbacks.EarlyStopping(monitor="val_loss", patience=10)
 reduce_lr = callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5)
 
 # Define modifiable training hyperparameters.
-epochs = 20
-batch_size = 5
+epochs = 100
+batch_size = 8
 
 # Fit the model to the training data.
 predrnn.fit(
@@ -159,27 +174,33 @@ predrnn.fit(
     callbacks=[early_stopping, reduce_lr],
 )
 
+# Save the model.
+predrnn.save(model_save_path)
+
 # %% [markdown]
 # ## Results
 # ### Frame Prediction Visualizations
 
 # %%
 # Select a random example from the validation dataset.
-example = val_dataset[np.random.choice(range(len(val_dataset)), size=1)[0]]
+example = train_dataset[np.random.choice(range(len(val_dataset)), size=1)[0]]
 
 # Pick the first/last ten frames from the example.
 frames = example[:10, ...]
 original_frames = example[10:, ...]
+predicted_frames = []
 
 # Predict a new set of 10 frames.
-for _ in range(10):
+for i in range(10):
+    frames = example[i:i+10, ...]
     # Extract the model's prediction and post-process it.
     new_prediction = predrnn.predict(np.expand_dims(frames, axis=0))
     new_prediction = np.squeeze(new_prediction, axis=0)
     predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
 
     # Extend the set of prediction frames.
-    frames = np.concatenate((frames, predicted_frame), axis=0)
+    # frames = np.concatenate((frames, predicted_frame), axis=0)
+    predicted_frames.append(predicted_frame)
 
 # Construct a figure for the original and new frames.
 fig, axes = plt.subplots(2, 10, figsize=(20, 4))
@@ -191,9 +212,9 @@ for idx, ax in enumerate(axes[0]):
     ax.axis("off")
 
 # Plot the new frames.
-new_frames = frames[10:, ...]
+# new_frames = frames[10:, ...]
 for idx, ax in enumerate(axes[1]):
-    ax.imshow(np.squeeze(new_frames[idx]), cmap="gray")
+    ax.imshow(np.squeeze(predicted_frames[idx]), cmap="gray")
     ax.set_title(f"Frame {idx + 11}")
     ax.axis("off")
 
