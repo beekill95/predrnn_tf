@@ -29,7 +29,7 @@ from predrnn_tf.layers import SpatialTemporalLSTMCell, StackedSpatialTemporalLST
 model_save_path = './saved_models/moving_mnist_predrnn'
 
 # %%
-print(f'{model_save_path=}')
+print(f'Saving model at {model_save_path=}')
 
 # %% [markdown]
 # # Moving MNIST with PredRNN
@@ -182,41 +182,56 @@ predrnn.save(model_save_path)
 # ### Frame Prediction Visualizations
 
 # %%
-# Select a random example from the validation dataset.
-example = train_dataset[np.random.choice(range(len(val_dataset)), size=1)[0]]
+def predict_and_visualize_future_frames(predrnn, example, use_true_frames: bool = True):
+    # Pick the first/last ten frames from the example.
+    frames = example[:10, ...]
+    original_frames = example[10:, ...]
+    predicted_frames = []
 
-# Pick the first/last ten frames from the example.
-frames = example[:10, ...]
-original_frames = example[10:, ...]
-predicted_frames = []
+    # Predict a new set of 10 frames.
+    for i in range(10):
+        if use_true_frames:
+            frames = example[i:i+10, ...]
+        elif len(predicted_frames):
+            frames = np.concatenate((frames, predicted_frames[-1]), axis=0)
 
-# Predict a new set of 10 frames.
-for i in range(10):
-    frames = example[i:i+10, ...]
-    # Extract the model's prediction and post-process it.
-    new_prediction = predrnn.predict(np.expand_dims(frames, axis=0))
-    new_prediction = np.squeeze(new_prediction, axis=0)
-    predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
+        # Extract the model's prediction and post-process it.
+        new_prediction = predrnn.predict(np.expand_dims(frames, axis=0))
+        new_prediction = np.squeeze(new_prediction, axis=0)
+        predicted_frame = np.expand_dims(new_prediction[-1, ...], axis=0)
 
-    # Extend the set of prediction frames.
-    # frames = np.concatenate((frames, predicted_frame), axis=0)
-    predicted_frames.append(predicted_frame)
+        # Extend the set of prediction frames.
+        predicted_frames.append(predicted_frame)
 
-# Construct a figure for the original and new frames.
-fig, axes = plt.subplots(2, 10, figsize=(20, 4))
+    # Construct a figure for the original and new frames.
+    _, axes = plt.subplots(2, 10, figsize=(20, 4), layout='constrained')
 
-# Plot the original frames.
-for idx, ax in enumerate(axes[0]):
-    ax.imshow(np.squeeze(original_frames[idx]), cmap="gray")
-    ax.set_title(f"Frame {idx + 11}")
-    ax.axis("off")
+    # Plot the original frames.
+    for idx, ax in enumerate(axes[0]):
+        ax.imshow(np.squeeze(original_frames[idx]), cmap="gray")
+        ax.set_title(f"Frame {idx + 11}")
+        ax.axis("off")
 
-# Plot the new frames.
-# new_frames = frames[10:, ...]
-for idx, ax in enumerate(axes[1]):
-    ax.imshow(np.squeeze(predicted_frames[idx]), cmap="gray")
-    ax.set_title(f"Frame {idx + 11}")
-    ax.axis("off")
+    # Plot the new frames.
+    # new_frames = frames[10:, ...]
+    for idx, ax in enumerate(axes[1]):
+        ax.imshow(np.squeeze(predicted_frames[idx]), cmap="gray")
+        ax.set_title(f"Frame {idx + 11}")
+        ax.axis("off")
 
-# Display the figure.
-plt.show()
+
+# Select a random example from the training dataset.
+example = train_dataset[np.random.choice(range(len(train_dataset)), size=1)[0]]
+predict_and_visualize_future_frames(predrnn, example)
+
+# %%
+example = train_dataset[np.random.choice(range(len(train_dataset)), size=1)[0]]
+predict_and_visualize_future_frames(predrnn, example, use_true_frames=False)
+
+# %%
+example = val_dataset[np.random.choice(range(len(val_dataset)), size=1)[0]]
+predict_and_visualize_future_frames(predrnn, example)
+
+# %%
+example = val_dataset[np.random.choice(range(len(val_dataset)), size=1)[0]]
+predict_and_visualize_future_frames(predrnn, example, use_true_frames=False)
