@@ -10,5 +10,5 @@ module load deeplearning
 conda activate predrnn
 cat examples/moving_mnist_predrnn.py \
     | jupytext --to ipynb \
-    | papermill -p model_save_path "./saved_models/moving_mnist_predrnn_$SLURM_JOBID" \
-    > "examples/moving_mnist_predrnn_out_$SLURM_JOBID.ipynb"
+    | papermill - "examples/moving_mnist_predrnn_out_$SLURM_JOBID.ipynb" \
+    -p model_save_path "./saved_models/moving_mnist_predrnn_$SLURM_JOBID"
