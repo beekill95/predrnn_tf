@@ -18,6 +18,19 @@ class PredRNNCell(layers.Layer):
         self._cell = cell
         self._out = out_conv
 
+    @property
+    def state_size(self):
+        return self._cell.state_size
+
+    def build(self, input_shape):
+        self._cell.build(input_shape)
+
+        cell_output_size = self._cell.output_size[1:]
+        self._out.build(cell_output_size)
+
+        self.ouput_size = self._out.compute_output_shape(cell_output_size)
+        self.built = True
+
     def call(self, inputs, states, training=None):
         o, s = self._cell(inputs, states, training=training)
         o = self._out(o)

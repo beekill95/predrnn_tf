@@ -19,7 +19,11 @@ from __future__ import annotations
 
 import keras
 from keras import layers
-from predrnn_tf.layers import SpatialTemporalLSTMCell, StackedSpatialTemporalLSTMCell
+from predrnn_tf.layers import (
+    SpatialTemporalLSTMCell,
+    StackedSpatialTemporalLSTMCell,
+    PredRNNCell,
+)
 
 # %%
 cells = StackedSpatialTemporalLSTMCell([
@@ -27,9 +31,13 @@ cells = StackedSpatialTemporalLSTMCell([
     SpatialTemporalLSTMCell(64, 3),
     SpatialTemporalLSTMCell(128, 3),
 ])
+predrnn_cell = PredRNNCell(
+    cells,
+    layers.Conv2D(3, 1),
+)
 
 x = keras.Input(shape=(None, 32, 32, 3))
-rnn = layers.RNN(cells)
+rnn = layers.RNN(predrnn_cell, return_sequences=True)
 y = rnn(x)
 
 # %%
