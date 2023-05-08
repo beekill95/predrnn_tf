@@ -47,10 +47,6 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         print('parent')
         return 0.
 
-    def build(self, input_shape):
-        self._cell.build(input_shape)
-        self.built = True
-
     def call(self, inputs, states, training=None):
         """
         Perform scheduled sampling on the inputs.
@@ -71,7 +67,7 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         inner_cell_previous_output = states[-1]
 
         if not training:
-            o, s = self._cell.call(inputs, inner_cell_states, trainning=training)
+            o, s = self._cell(inputs, inner_cell_states, trainning=training)
             return o, (*s, o)
 
         # Probability of choosing the true inputs.
@@ -82,7 +78,7 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         # otherwise we use the output at the previous timestep.
         inputs = tf.where(prob <= self.epsilon_k, inputs, inner_cell_previous_output)
 
-        o, s = self._cell.call(inputs, inner_cell_states, training=training)
+        o, s = self._cell(inputs, inner_cell_states, training=training)
         return o, (*s, o)
 
     def get_config(self):
