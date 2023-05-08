@@ -2,12 +2,13 @@
 
 # This should be executed with slurm srun.
 
-# Load any modules that your program needs
+# Load any modules that your program needs.
 module load deeplearning
 
-# Run your program
+# Run moving_mnist_predrnn .py script as .ipynb notebook
+# and store the result notebook.
 conda activate predrnn
-papermill \
-    examples/moving_mnist_predrnn.ipynb \
-    "examples/moving_mnist_predrnn_out_$SLURM_JOBID.ipynb" \
-    -p model_save_path "./saved_models/moving_mnist_predrnn_$SLURM_JOBID"
+cat examples/moving_mnist_predrnn.py \
+    | jupytext --to ipynb \
+    | papermill -p model_save_path "./saved_models/moving_mnist_predrnn_$SLURM_JOBID" \
+    > "examples/moving_mnist_predrnn_out_$SLURM_JOBID.ipynb"
