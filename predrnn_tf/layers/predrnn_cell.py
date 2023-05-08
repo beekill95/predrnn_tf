@@ -7,7 +7,7 @@ from .spatial_temporal_lstm_cell import SpatialTemporalLSTMCell
 from .stacked_spatial_temporal_lstm_cell import StackedSpatialTemporalLSTMCell
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable('predrnn_tf')
 class PredRNNCell(layers.Layer):
     def __init__(self,
                  cell: SpatialTemporalLSTMCell | StackedSpatialTemporalLSTMCell,
@@ -39,12 +39,16 @@ class PredRNNCell(layers.Layer):
     def get_config(self):
         return {
             **super().get_config(),
-            'cell': self._cell,
-            'out_conv': self._out,
+            'cell': layers.serialize(self._cell),
+            'out_conv': layers.serialize(self._out),
         }
 
     @classmethod
     def from_config(cls, config):
-        cell = layers.deserialize(config.pop('cell'))
+        # Workaround because we cannot use `layers.deserialize`:
+        cell_config = config.pop('cell')
+        cell_cls = tf.keras.utils.get_custom_objects()[cell_config['class_name']]
+        cell = cell_cls.from_config(cell_config['config'])
+
         out = layers.deserialize(config.pop('out_conv'))
         return cls(cell=cell, out_conv=out, **config) # pyright: ignore

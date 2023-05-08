@@ -9,7 +9,7 @@ from .types import *
 from .spatial_temporal_lstm_cell import SpatialTemporalLSTMCell
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable('predrnn_tf')
 class StackedSpatialTemporalLSTMCell(layers.Layer):
     def __init__(self, cells: list[SpatialTemporalLSTMCell], **kwargs):
         """
@@ -108,10 +108,13 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
     def get_config(self):
         return {
             **super().get_config(),
-            'cells': self._cells,
+            'cells': [layers.serialize(c) for c in self._cells],
         }
 
     @classmethod
     def from_config(cls, config):
-        cells = [layers.deserialize(c) for c in config.pop('cells')]
+        # FIXME: we should be able to use this:
+        # cells = [layers.deserialize(c) for c in config.pop('cells')]
+        cells = [SpatialTemporalLSTMCell.from_config(c['config'])
+                 for c in config.pop('cells')]
         return cls(cells=cells, **config)

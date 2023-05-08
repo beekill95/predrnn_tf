@@ -15,7 +15,7 @@ from typing import Literal, Callable
 from .types import *
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable('predrnn_tf')
 class SpatialTemporalLSTMCell(layers.Layer):
     def __init__(self,
                  filters: int,
@@ -35,12 +35,15 @@ class SpatialTemporalLSTMCell(layers.Layer):
                  kernel_constraint: ConstraintType | None = None,
                  recurrent_constraint: ConstraintType | None = None,
                  bias_constraint: ConstraintType | None = None,
-                 decouple_loss: bool = True,
+                 decouple_loss: bool = False,
                  **kwargs):
         """
         Construct a Spatial temporal LSTM cell as described in the
         [paper](https://dl.acm.org/doi/abs/10.5555/3294771.3294855)
         and the [paper](https://arxiv.org/abs/2103.09504).
+
+        Notes:
+            * decouple_loss = True is not working right now due to a bug in keras.
 
         Parameters
         filters: int
