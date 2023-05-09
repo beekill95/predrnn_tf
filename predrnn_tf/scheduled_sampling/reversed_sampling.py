@@ -86,9 +86,10 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         inner_cell_states = states[:-1]
 
         # Inner cell's output at the previous timestep.
-        # The shape should be the same as the inputs (batch_size, C, H, W)
-        # or (batch_size, H, W, C).
+        # The shape should be the same as the inputs
+        # (batch_size, C, H, W) or (batch_size, H, W, C).
         inner_cell_previous_output = states[-1]
+        is_first_timestep = tf.reduce_sum(tf.abs(inner_cell_previous_output)) == 0.
 
         if not training:
             o, s = self._cell(inputs, inner_cell_states, training=training)
@@ -100,7 +101,10 @@ class ReversedScheduledSamplingLayer(layers.Layer):
 
         # We use the true inputs with probability epsilon_k,
         # otherwise we use the output at the previous timestep.
-        inputs = tf.where(prob <= self.epsilon_k, inputs, inner_cell_previous_output)
+        # For the first timestep, we'll always use the true inputs.
+        inputs = tf.where((prob <= self.epsilon_k) & is_first_timestep,
+                          inputs,
+                          inner_cell_previous_output)
 
         o, s = self._cell(inputs, inner_cell_states, training=training)
         return o, (*s, o)
