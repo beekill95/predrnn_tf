@@ -20,8 +20,8 @@ class LinearScheduledSamplingLayer(ReversedScheduledSamplingLayer):
         super().__init__(cell, iterations, **kwargs)
 
         assert alpha > 0
-        assert 0. < epsilon_e < 1.
-        assert 0. < epsilon_s < 1.
+        assert 0. <= epsilon_s < 1.
+        assert epsilon_s < epsilon_e <= 1.
 
         self._epsilon_e = epsilon_e
         self._epsilon_s = epsilon_s
