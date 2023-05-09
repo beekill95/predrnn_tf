@@ -5,7 +5,7 @@ import tensorflow as tf
 from .reversed_sampling import ReversedScheduledSamplingLayer, from_config
 
 
-@tf.keras.utils.register_keras_serializable()
+@tf.keras.utils.register_keras_serializable('predrnn_tf')
 class SigmoidScheduledSamplingLayer(ReversedScheduledSamplingLayer):
     def __init__(self, cell, *,
                  epsilon_e: float,

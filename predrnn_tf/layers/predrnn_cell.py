@@ -28,7 +28,7 @@ class PredRNNCell(layers.Layer):
         cell_output_size = self._cell.output_size[1:]
         self._out.build(cell_output_size)
 
-        self.ouput_size = self._out.compute_output_shape(cell_output_size)
+        self.output_size = self._out.compute_output_shape(cell_output_size)
         self.built = True
 
     def call(self, inputs, states, training=None):

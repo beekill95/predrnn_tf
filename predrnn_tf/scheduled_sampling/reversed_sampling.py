@@ -31,21 +31,26 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         self._iterations = iterations
 
     @property
-    def state_size(self):
-        cell_output_size = self.output_size
-        cell_state_size = self._cell.state_size
-        # The state size of this layer will be the cell's state size
-        # and the cell's output size.
-        return (*cell_state_size, cell_output_size[1:])
+    def output_size(self):
+        return self._output_size
 
     @property
-    def output_size(self):
-        return self._cell.output_size
+    def state_size(self):
+        return self._state_size
 
     @property
     def epsilon_k(self):
-        print('parent')
-        return 0.
+        # Default behavior is always use the true inputs.
+        return 1.
+
+    def build(self, input_shape):
+        self._cell.build(input_shape)
+        self.built = True
+
+        cell_output_size = self._cell.output_size
+        cell_state_size = self._cell.state_size
+        self._output_size = cell_output_size
+        self._state_size = (*cell_state_size, cell_output_size)
 
     def call(self, inputs, states, training=None):
         """
@@ -67,11 +72,11 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         inner_cell_previous_output = states[-1]
 
         if not training:
-            o, s = self._cell(inputs, inner_cell_states, trainning=training)
+            o, s = self._cell(inputs, inner_cell_states, training=training)
             return o, (*s, o)
 
         # Probability of choosing the true inputs.
-        batch_size = inputs.shape[0]
+        batch_size = tf.shape(inputs)[0]
         prob = tf.random.uniform((batch_size, ))
 
         # We use the true inputs with probability epsilon_k,
@@ -84,7 +89,7 @@ class ReversedScheduledSamplingLayer(layers.Layer):
     def get_config(self):
         return {
             **super().get_config(),
-            'cell': self._cell,
+            'cell': layers.serialize(self._cell),
             'iterations': self._iterations,
         }
 
