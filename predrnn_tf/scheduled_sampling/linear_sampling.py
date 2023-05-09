@@ -12,12 +12,18 @@ class LinearScheduledSamplingLayer(ReversedScheduledSamplingLayer):
                  epsilon_s: float,
                  alpha: float,
                  iterations: int = 0,
+                 reversed_iterations_start: int = 0,
+                 orig_sampling_prob: float = 0.5,
                  **kwargs):
         """
         Linear scheduled sampling:
             epsilon_k = min(epsilon_s + alpha * iterations, epsilon_e)
         """
-        super().__init__(cell, iterations, **kwargs)
+        super().__init__(cell,
+                         iterations=iterations,
+                         reversed_iterations_start=reversed_iterations_start,
+                         orig_sampling_prob=orig_sampling_prob,
+                         **kwargs)
 
         assert alpha > 0
         assert 0. <= epsilon_s < 1.
@@ -27,9 +33,9 @@ class LinearScheduledSamplingLayer(ReversedScheduledSamplingLayer):
         self._epsilon_s = epsilon_s
         self._alpha = alpha
 
-    @property
-    def epsilon_k(self):
-        return min(self._epsilon_s + self._alpha * self._iterations, self._epsilon_e)
+    def get_reversed_sampling_prob(self, iterations):
+        return min(self._epsilon_s + self._alpha * iterations,
+                   self._epsilon_e)
 
     def get_config(self):
         return {
@@ -42,4 +48,3 @@ class LinearScheduledSamplingLayer(ReversedScheduledSamplingLayer):
     @classmethod
     def from_config(cls, config):
         return from_config(cls, config)
-

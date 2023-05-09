@@ -13,12 +13,18 @@ class SigmoidScheduledSamplingLayer(ReversedScheduledSamplingLayer):
                  alpha: float,
                  beta: int,
                  iterations: int = 0,
+                 reversed_iterations_start: int = 0,
+                 orig_sampling_prob: float = 0.5,
                  **kwargs):
         """
         Sigmoid scheduled sampling:
             epsilon_k = epsilon_s + (epsilon_e - epsilon_s) * (1. / (1. + exp((beta - k) / alpha)))
         """
-        super().__init__(cell, iterations, **kwargs)
+        super().__init__(cell,
+                         iterations=iterations,
+                         reversed_iterations_start=reversed_iterations_start,
+                         orig_sampling_prob=orig_sampling_prob,
+                         **kwargs)
 
         assert alpha > 0
         assert 0. <= epsilon_s < 1.
@@ -30,9 +36,8 @@ class SigmoidScheduledSamplingLayer(ReversedScheduledSamplingLayer):
         self._alpha = alpha
         self._beta = beta
 
-    @property
-    def epsilon_k(self):
-        curve = 1. / (1. + tf.exp((self._beta - self._iterations) / self._alpha))
+    def get_reversed_sampling_prob(self, iterations):
+        curve = 1. / (1. + tf.exp((self._beta - iterations) / self._alpha))
         return self._epsilon_s + (self._epsilon_e - self._epsilon_s) * curve
 
     def get_config(self):
