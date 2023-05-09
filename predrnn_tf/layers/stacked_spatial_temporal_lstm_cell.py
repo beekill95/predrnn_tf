@@ -113,8 +113,5 @@ class StackedSpatialTemporalLSTMCell(layers.Layer):
 
     @classmethod
     def from_config(cls, config):
-        # FIXME: we should be able to use this:
-        # cells = [layers.deserialize(c) for c in config.pop('cells')]
-        cells = [SpatialTemporalLSTMCell.from_config(c['config'])
-                 for c in config.pop('cells')]
+        cells = [layers.deserialize(c) for c in config.pop('cells')]
         return cls(cells=cells, **config)

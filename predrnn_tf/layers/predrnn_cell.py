@@ -45,10 +45,6 @@ class PredRNNCell(layers.Layer):
 
     @classmethod
     def from_config(cls, config):
-        # Workaround because we cannot use `layers.deserialize`:
-        cell_config = config.pop('cell')
-        cell_cls = tf.keras.utils.get_custom_objects()[cell_config['class_name']]
-        cell = cell_cls.from_config(cell_config['config'])
-
+        cell = layers.deserialize(config.pop('cell'))
         out = layers.deserialize(config.pop('out_conv'))
         return cls(cell=cell, out_conv=out, **config) # pyright: ignore
