@@ -43,15 +43,16 @@ def get_epsilon_k(sampling_layer, iterations: int):
 
 
 def plot_results(iterations, epsilon_k, title):
-# Plot the result.
+    # Plot the result.
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(iterations, epsilon_k)
     ax.set_title(title)
+    ax.set_ylim(0., 1.)
     fig.tight_layout()
 
 
 linear_sampling = LinearScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha)
+    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, reversed_iterations_start=5000)
 linear_epsilon_k = [get_epsilon_k(linear_sampling, i) for i in iterations]
 plot_results(iterations, linear_epsilon_k, 'Linear Scheduled Sampling')
 
@@ -71,6 +72,6 @@ plot_results(iterations, expo_epsilon_k, 'Exponential Scheduled Sampling')
 # %%
 beta = 5000
 sigmoid_sampling = SigmoidScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, beta=beta)
+    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, beta=beta, reversed_iterations_start=5000)
 sigmoid_epsilon_k = [get_epsilon_k(sigmoid_sampling, i) for i in iterations]
 plot_results(iterations, sigmoid_epsilon_k, 'Sigmoid Scheduled Sampling')
