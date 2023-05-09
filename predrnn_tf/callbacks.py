@@ -11,6 +11,6 @@ class UpdateReversedScheduleSamplingProbCallback(callbacks.Callback):
         self._layer = layer
         self._iterations = layer.iterations
 
-    def on_batch_begin(self, **_):
+    def on_batch_begin(self, *_, **__):
         self._iterations += 1
         self._layer.iterations = self._iterations

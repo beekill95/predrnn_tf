@@ -102,7 +102,7 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         # We use the true inputs with probability epsilon_k,
         # otherwise we use the output at the previous timestep.
         # For the first timestep, we'll always use the true inputs.
-        inputs = tf.where((prob <= self.epsilon_k) & is_first_timestep,
+        inputs = tf.where((prob <= self.epsilon_k) | is_first_timestep,
                           inputs,
                           inner_cell_previous_output)
 
