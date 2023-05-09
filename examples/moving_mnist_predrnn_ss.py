@@ -21,6 +21,7 @@ import keras
 from keras import layers, utils, losses, optimizers, callbacks
 import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
 
 from predrnn_tf.layers import (
     SpatialTemporalLSTMCell,
