@@ -2,7 +2,7 @@
 
 # Script parameters.
 models=("predrnn" "convlstm")
-use_ss=(true false)
+use_ss=("True" "False")
 runs_per_config=${1-5}
 
 # Schedule job to run with sbatch.
@@ -38,6 +38,12 @@ for model in "${models[@]}";
 do
     for ss in "${use_ss[@]}";
     do
+        # Check invalid configuration.
+        if [ "$model" = "convlstm" ] && [ "$ss" = "True" ]
+        then
+            continue
+        fi
+
         for i in $(seq 1 $runs_per_config);
         do
             schedule_slurm_job $model $ss
