@@ -5,11 +5,11 @@ description = "PredRNN implementation using Tensorflow."
 authors = ["Quan Nguyen <nguyenmbquan95@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "predrnn_tf"}]
+packages = [{ include = "predrnn_tf" }]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"
-tensorflow = "~2.9.1"
+tensorflow = "^2.9.1"
 
 [tool.poetry.group.dev.dependencies]
 jupyterlab = "^3.6.3"
