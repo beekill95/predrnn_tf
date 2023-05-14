@@ -12,7 +12,7 @@ module load deeplearning
 conda activate predrnn
 cat examples/moving_mnist_all.py \
     | jupytext --to ipynb \
-    | papermill - "examples/moving_mnist_all_out-$model-$use_ss-$SLURM_JOBID.ipynb" \
-    -p model_save_path "./saved_models/moving_mnist_all-$model-$use_ss-$SLURM_JOBID" \
+    | papermill - "examples/moving_mnist_all_out-$SLURM_JOBID-$model-$use_ss.ipynb" \
+    -p model_save_path "./saved_models/moving_mnist_all-$SLURM_JOBID-$model-$use_ss" \
     -p model_type $model \
     -p use_reversed_sampling $use_ss

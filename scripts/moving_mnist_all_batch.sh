@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Script parameters.
-models=("predrnn" "convlstm")
-use_ss=("True" "False")
+model_options=("predrnn" "convlstm")
+use_ss_options=("True" "False")
 runs_per_config=${1-5}
 
 # Schedule job to run with sbatch.
@@ -34,19 +34,19 @@ EOT
 }
 
 # Schedule multiple jobs at once.
-for model in "${models[@]}";
+for model_option in "${model_options[@]}";
 do
-    for ss in "${use_ss[@]}";
+    for ss_option in "${use_ss_options[@]}";
     do
         # Check invalid configuration.
-        if [ "$model" = "convlstm" ] && [ "$ss" = "True" ]
+        if [ "$model_option" = "convlstm" ] && [ "$ss_option" = "True" ]
         then
             continue
         fi
 
         for i in $(seq 1 $runs_per_config);
         do
-            schedule_slurm_job $model $ss
+            schedule_slurm_job $model_option $ss_option
         done
     done
 done
