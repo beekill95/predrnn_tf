@@ -207,7 +207,7 @@ def create_predrnn_model(input_shape: tuple, use_reversed_sampling: bool = False
     if use_reversed_sampling:
         cell = LinearScheduledSamplingLayer(
             predrnn_cell,
-            epsilon_s=0.,
+            epsilon_s=0.5,
             epsilon_e=1.,
             alpha=1e-5,
             reversed_iterations_start=20000,
