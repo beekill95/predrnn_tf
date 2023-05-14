@@ -8,7 +8,8 @@ class ReversedScheduledSamplingLayer(layers.Layer):
     def __init__(self, cell, *,
                  iterations: int = 0,
                  reversed_iterations_start: int = 0,
-                 orig_sampling_prob: float = 0.5,
+                 epsilon_s: float = 0.5,
+                 epsilon_e: float = 1.0,
                  **kwargs):
         """
         This class implements (reversed) scheduled sampling
@@ -30,10 +31,14 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         super().__init__(**kwargs)
 
         assert iterations >= 0
+        assert 0. <= epsilon_s < 1.
+        assert epsilon_s < epsilon_e <= 1.
+
         self._cell = cell
         self._iterations = iterations
         self._reversed_iterations_start = reversed_iterations_start
-        self._orig_sampling_prob = orig_sampling_prob
+        self._epsilon_s = epsilon_s
+        self._epsilon_e = epsilon_e
 
     @property
     def iterations(self):
@@ -53,11 +58,22 @@ class ReversedScheduledSamplingLayer(layers.Layer):
         return self._state_size
 
     @property
+    def epsilon_s(self):
+        return self._epsilon_s
+
+    @property
+    def epsilon_e(self):
+        return self._epsilon_e
+
+    @property
     def epsilon_k(self):
+        reversed_iterations_start = self._reversed_iterations_start
         iterations = self._iterations
-        return (self._orig_sampling_prob
-                if iterations < self._reversed_iterations_start
-                else self.get_reversed_sampling_prob(iterations))
+
+        return (self._epsilon_s
+                if iterations < reversed_iterations_start
+                else self.get_reversed_sampling_prob(
+                    iterations - reversed_iterations_start))
 
     def get_reversed_sampling_prob(self, iterations):
         return 0.
@@ -114,8 +130,9 @@ class ReversedScheduledSamplingLayer(layers.Layer):
             **super().get_config(),
             'cell': layers.serialize(self._cell),
             'iterations': self._iterations,
+            'epsilon_s': self.epsilon_s,
+            'epsilon_e': self.epsilon_e,
             'reversed_iterations_start': self._reversed_iterations_start,
-            'orig_sampling_prob': self._orig_sampling_prob,
         }
 
 

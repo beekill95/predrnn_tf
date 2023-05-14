@@ -31,7 +31,7 @@ from predrnn_tf.scheduled_sampling import (
 # ## Linear Scheduled Sampling
 
 # %%
-epsilon_s = 0.0
+epsilon_s = 0.5
 epsilon_e = 1.0
 alpha = 1e-4
 iterations = list(range(10000))
@@ -62,7 +62,7 @@ plot_results(iterations, linear_epsilon_k, 'Linear Scheduled Sampling')
 # %%
 alpha = 1e3
 expo_sampling = ExponentialScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha)
+    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, reversed_iterations_start=5000)
 expo_epsilon_k = [get_epsilon_k(expo_sampling, i) for i in iterations]
 plot_results(iterations, expo_epsilon_k, 'Exponential Scheduled Sampling')
 
@@ -70,8 +70,8 @@ plot_results(iterations, expo_epsilon_k, 'Exponential Scheduled Sampling')
 # ## Sigmoid Scheduled Sampling
 
 # %%
-beta = 5000
+beta = 2500
 sigmoid_sampling = SigmoidScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, beta=beta, reversed_iterations_start=5000)
+    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=500, beta=beta, reversed_iterations_start=5000)
 sigmoid_epsilon_k = [get_epsilon_k(sigmoid_sampling, i) for i in iterations]
 plot_results(iterations, sigmoid_epsilon_k, 'Sigmoid Scheduled Sampling')
