@@ -16,14 +16,14 @@ enabling the loss will raise error during runtime.
 
 ## Accuracy
 
-_WIP: Performance on Moving MNIST dataset
+Performance (MSE) on Moving MNIST dataset
 (results produced by running `scripts/moving_mnist_all_batch.sh 5`)_
 
-|                                    | Run #1  | Run #2  | Run #3  | Run #4  | Run #5  | Mean     | Std     |
-|------------------------------------|---------|---------|---------|---------|---------|----------|---------|
-| ConvLSTM                           | 0.00958 | 0.00950 | 0.03792 | 0.00921 | 0.03973 | 0.021188 | 0.01611 |
-| PredRNN without Scheduled Sampling | 0.00893 | 0.00802 | 0.00822 | 0.00873 | 0.00719 | 0.008218 | 0.00068 |
-| PredRNN with Scheduled Sampling    | 0.00805 | 0.00758 | 0.00805 | 0.00727 | 0.00827 | 0.007844 | 0.00041 |
+|                                        | Run #1  | Run #2  | Run #3  | Run #4  | Run #5  | Mean     | Std             |
+|----------------------------------------|---------|---------|---------|---------|---------|----------|-----------------|
+| ConvLSTM                               | 0.03618 | 0.00951 | 0.04391 | 0.00956 | 0.03485 | 0.026802 |   0.01613769407 |
+| PredRNN without Scheduled Sampling     | 0.00705 | 0.00728 | 0.00703 | 0.00723 | 0.00733 | 0.007184 | 0.0001363084737 |
+| PredRNN with Linear Scheduled Sampling | 0.00798 | 0.00741 | 0.01012 | 0.01468 | 0.00822 | 0.009682 |   0.00297355343 |
 
 ## Installation
 
