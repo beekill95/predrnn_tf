@@ -223,7 +223,7 @@ reduce_lr = callbacks.ReduceLROnPlateau(monitor="val_loss", patience=5)
 model_callbacks = [
     early_stopping,
     reduce_lr,
-    UpdateReversedScheduleSamplingProbCallback(model.get_layer('rnn')[0].cell),
+    UpdateReversedScheduleSamplingProbCallback(model.get_layer('rnn').cell),
 ]
 
 # Define modifiable training hyperparameters.
