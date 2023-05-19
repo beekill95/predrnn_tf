@@ -34,7 +34,7 @@ from predrnn_tf.scheduled_sampling import (
 epsilon_s = 0.5
 epsilon_e = 1.0
 alpha = 1e-4
-iterations = list(range(10000))
+iterations = list(range(63000))
 
 # %%
 def get_epsilon_k(sampling_layer, iterations: int):
@@ -47,12 +47,20 @@ def plot_results(iterations, epsilon_k, title):
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.plot(iterations, epsilon_k)
     ax.set_title(title)
-    ax.set_ylim(0., 1.)
+    ax.set_ylim(0., 1.1)
     fig.tight_layout()
 
 
+# linear_sampling = LinearScheduledSamplingLayer(
+#     None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, reversed_iterations_start=5000)
 linear_sampling = LinearScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, reversed_iterations_start=5000)
+            None,
+            epsilon_s=0.5,
+            epsilon_e=1.,
+            alpha=15e-6,
+            reversed_iterations_start=20000,
+            name='ss_cell',
+        )
 linear_epsilon_k = [get_epsilon_k(linear_sampling, i) for i in iterations]
 plot_results(iterations, linear_epsilon_k, 'Linear Scheduled Sampling')
 
@@ -60,9 +68,13 @@ plot_results(iterations, linear_epsilon_k, 'Linear Scheduled Sampling')
 # ## Exponential Scheduled Sampling
 
 # %%
-alpha = 1e3
+alpha = 1e4
 expo_sampling = ExponentialScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=alpha, reversed_iterations_start=5000)
+    None,
+    epsilon_s=epsilon_s,
+    epsilon_e=epsilon_e,
+    alpha=alpha,
+    reversed_iterations_start=20000)
 expo_epsilon_k = [get_epsilon_k(expo_sampling, i) for i in iterations]
 plot_results(iterations, expo_epsilon_k, 'Exponential Scheduled Sampling')
 
@@ -70,8 +82,13 @@ plot_results(iterations, expo_epsilon_k, 'Exponential Scheduled Sampling')
 # ## Sigmoid Scheduled Sampling
 
 # %%
-beta = 2500
+beta = 20000
 sigmoid_sampling = SigmoidScheduledSamplingLayer(
-    None, epsilon_s=epsilon_s, epsilon_e=epsilon_e, alpha=500, beta=beta, reversed_iterations_start=5000)
+    None,
+    epsilon_s=epsilon_s,
+    epsilon_e=epsilon_e,
+    alpha=5000,
+    beta=beta,
+    reversed_iterations_start=20000)
 sigmoid_epsilon_k = [get_epsilon_k(sigmoid_sampling, i) for i in iterations]
 plot_results(iterations, sigmoid_epsilon_k, 'Sigmoid Scheduled Sampling')

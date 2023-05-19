@@ -141,7 +141,7 @@ def create_ss_layer(cell, ss_type: Literal['linear', 'expo', 'sigmoid']):
             cell,
             epsilon_s=0.5,
             epsilon_e=1.,
-            alpha=1e-5,
+            alpha=15e-6,
             reversed_iterations_start=20000,
             name='ss_cell',
         )
@@ -150,6 +150,7 @@ def create_ss_layer(cell, ss_type: Literal['linear', 'expo', 'sigmoid']):
             cell,
             epsilon_s=0.5,
             epsilon_e=1.,
+            alpha=1e4,
             reversed_iterations_start=20000,
             name='ss_cell',
         )
@@ -158,6 +159,8 @@ def create_ss_layer(cell, ss_type: Literal['linear', 'expo', 'sigmoid']):
             cell,
             epsilon_s=0.5,
             epsilon_e=1.,
+            beta=20000,
+            alpha=5000,
             reversed_iterations_start=20000,
             name='ss_cell',
         )
