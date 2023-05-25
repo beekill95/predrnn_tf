@@ -25,6 +25,14 @@ Performance (MSE) on Moving MNIST dataset
 | PredRNN without Scheduled Sampling     | 0.00705 | 0.00728 | 0.00703 | 0.00723 | 0.00733 | 0.007184 | 0.0001363084737 |
 | PredRNN with Linear Scheduled Sampling | 0.00798 | 0.00741 | 0.01012 | 0.01468 | 0.00822 | 0.009682 |   0.00297355343 |
 
+Performance (MSE) on Moving MNIST dataset with different scheduled sampling strategies.
+
+|                                         | Run #1  | Run #2  | Run #3  | Run #4  | Run #5  | Mean     | Std             |
+|-----------------------------------------|---------|---------|---------|---------|---------|----------|-----------------|
+| PredRNN with Linear Scheduled Sampling  | 0.01254 | 0.01095 | 0.01231 | 0.01032 | 0.01071 | 0.011366 | 0.0009958564154 |
+| PredRNN with Expo Scheduled Sampling    | 0.00816 | 0.00868 | 0.01382 | 0.01027 | 0.01094 | 0.010374 |  0.002234810954 |
+| PredRNN with Sigmoid Scheduled Sampling | 0.00938 | 0.00999 | 0.00797 | 0.01007 | 0.00775 | 0.009032 |  0.001105404903 |
+
 ## Installation
 
 The repository can be installed as module using either `pip` or `poetry`.
